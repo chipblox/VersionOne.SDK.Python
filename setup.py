@@ -19,7 +19,7 @@ setup(
   install_requires = [
     'testtools',
     'iso8601',
-    'requests-ntlm',
+    'python-ntlm3',
     ],
     
   test_suite = "v1pysdk.tests",

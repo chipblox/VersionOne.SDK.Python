@@ -14,7 +14,7 @@ except ImportError:
 AUTH_HANDLERS = [HTTPBasicAuthHandler]
 
 try:
-    from requests_ntlm.HTTPNtlmAuthHandler import HTTPNtlmAuthHandler
+    from ntlm3.HTTPNtlmAuthHandler import HTTPNtlmAuthHandler
 except ImportError:
     logging.warn("Windows integrated authentication module (ntlm) not found.")
 else:
