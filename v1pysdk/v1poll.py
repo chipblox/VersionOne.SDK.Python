@@ -1,7 +1,7 @@
 
 
 
-from v1meta import V1Meta
+from .v1meta import V1Meta
 
 import sqlite3
 from collections import defaultdict
@@ -57,8 +57,3 @@ class V1Poll(object):
           
         for row in rows:
           registered_funcs = self.registrations[row['asset_type']]
-          
-          
-        
-            
-        

@@ -1,5 +1,5 @@
-from urllib import urlencode
-from string_utils import split_attribute
+from urllib.parse import urlencode
+from .string_utils import split_attribute
 
 class V1Query(object):
   """A fluent query object. Use .select() and .where() to add items to the

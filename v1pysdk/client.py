@@ -1,9 +1,8 @@
 
 import logging, time, base64
-import urllib2
-from urllib2 import Request, urlopen, HTTPError, HTTPBasicAuthHandler, HTTPCookieProcessor
-from urllib import urlencode
-from urlparse import urlunparse, urlparse
+from urllib.request import build_opener, urlopen, HTTPBasicAuthHandler, HTTPCookieProcessor, HTTPPasswordMgrWithDefaultRealm
+from urllib.error import HTTPError
+from urllib.parse import urlunparse, urlparse
 
 try:
     from xml.etree import ElementTree
@@ -15,7 +14,7 @@ except ImportError:
 AUTH_HANDLERS = [HTTPBasicAuthHandler]
 
 try:
-    from ntlm.HTTPNtlmAuthHandler import HTTPNtlmAuthHandler
+    from requests_ntlm.HTTPNtlmAuthHandler import HTTPNtlmAuthHandler
 except ImportError:
     logging.warn("Windows integrated authentication module (ntlm) not found.")
 else:
@@ -38,16 +37,18 @@ else:
     AUTH_HANDLERS.append(CustomHTTPNtlmAuthHandler)
 
 
+class V1Error(Exception):
+    pass
 
 
-class V1Error(Exception): pass
+class V1AssetNotFoundError(V1Error):
+    pass
 
-class V1AssetNotFoundError(V1Error): pass
 
 class V1Server(object):
   "Accesses a V1 HTTP server as a client of the XML API protocol"
 
-  def __init__(self, address="localhost", instance="VersionOne.Web", username='', password='', scheme="http", instance_url=None, logparent=None, loglevel=logging.ERROR):
+  def __init__(self, address="localhost", instance="VersionOne.Web", username='', password='', scheme="http", instance_url=None, logparent=None, loglevel=logging.ERROR, use_password_as_token=False):
     if instance_url:
       self.instance_url = instance_url
       parsed = urlparse(instance_url)
@@ -66,14 +67,17 @@ class V1Server(object):
     self.logger.setLevel(loglevel)
     self.username = username
     self.password = password
+    self.use_password_as_token = use_password_as_token
     self._install_opener()
-        
+
   def _install_opener(self):
     base_url = self.build_url('')
-    password_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+    password_manager = HTTPPasswordMgrWithDefaultRealm()
     password_manager.add_password(None, base_url, self.username, self.password)
     handlers = [HandlerClass(password_manager) for HandlerClass in AUTH_HANDLERS]
-    self.opener = urllib2.build_opener(*handlers)
+    self.opener = build_opener(*handlers)
+    if self.use_password_as_token:
+        self.opener.addheaders.append(('Authorization', 'Bearer ' + self.password))
     self.opener.add_handler(HTTPCookieProcessor())
 
   def http_get(self, url):
@@ -81,13 +85,13 @@ class V1Server(object):
     request.add_header("Content-Type", "text/xml;charset=UTF-8")
     response = self.opener.open(request)
     return response
-  
+
   def http_post(self, url, data=''):
     request = Request(url, data)
     request.add_header("Content-Type", "text/xml;charset=UTF-8")
     response = self.opener.open(request)
     return response
-    
+
   def build_url(self, path, query='', fragment='', params=''):
     "So we dont have to interpolate urls ad-hoc"
     path = self.instance + '/' + path.strip('/')
@@ -129,7 +133,7 @@ class V1Server(object):
       self._debug_headers(response.headers)
       self._debug_body(body, response.headers)
       return (None, body)
-    except HTTPError, e:
+    except HTTPError as e:
       if e.code == 401:
           raise
       body = e.fp.read()
@@ -166,33 +170,33 @@ class V1Server(object):
       else:
         raise V1Error(exception)
     return document
-   
-  def get_asset_xml(self, asset_type_name, oid, moment=None):
-    path = '/rest-1.v1/Data/{0}/{1}/{2}'.format(asset_type_name, oid, moment) if moment else '/rest-1.v1/Data/{0}/{1}'.format(asset_type_name, oid)
+
+  def get_asset_xml(self, asset_type_name, oid):
+    path = '/rest-1.v1/Data/{0}/{1}'.format(asset_type_name, oid)
     return self.get_xml(path)
-    
+
   def get_query_xml(self, asset_type_name, where=None, sel=None):
     path = '/rest-1.v1/Data/{0}'.format(asset_type_name)
     query = {}
     if where is not None:
         query['Where'] = where
     if sel is not None:
-        query['sel'] = sel        
+        query['sel'] = sel
     return self.get_xml(path, query=query)
-    
+
   def get_meta_xml(self, asset_type_name):
     path = '/meta.v1/{0}'.format(asset_type_name)
     return self.get_xml(path)
-    
+
   def execute_operation(self, asset_type_name, oid, opname):
     path = '/rest-1.v1/Data/{0}/{1}'.format(asset_type_name, oid)
     query = {'op': opname}
     return self.get_xml(path, query=query, postdata={})
-    
-  def get_attr(self, asset_type_name, oid, attrname, moment=None):
-    path = '/rest-1.v1/Data/{0}/{1}/{3}/{2}'.format(asset_type_name, oid, attrname, moment) if moment else '/rest-1.v1/Data/{0}/{1}/{2}'.format(asset_type_name, oid, attrname)
+
+  def get_attr(self, asset_type_name, oid, attrname):
+    path = '/rest-1.v1/Data/{0}/{1}/{2}'.format(asset_type_name, oid, attrname)
     return self.get_xml(path)
-  
+
   def create_asset(self, asset_type_name, xmldata, context_oid=''):
     body = ElementTree.tostring(xmldata, encoding="utf-8")
     query = {}
@@ -200,7 +204,7 @@ class V1Server(object):
       query = {'ctx': context_oid}
     path = '/rest-1.v1/Data/{0}'.format(asset_type_name)
     return self.get_xml(path, query=query, postdata=body)
-    
+
   def update_asset(self, asset_type_name, oid, update_doc):
     newdata = ElementTree.tostring(update_doc, encoding='utf-8')
     path = '/rest-1.v1/Data/{0}/{1}'.format(asset_type_name, oid)
@@ -213,11 +217,5 @@ class V1Server(object):
     if exception:
         raise exception
     return body
-    
-  set_attachment_blob = get_attachment_blob
-  
-    
-    
-  
-    
 
+  set_attachment_blob = get_attachment_blob

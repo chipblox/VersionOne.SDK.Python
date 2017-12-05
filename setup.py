@@ -20,7 +20,7 @@ setup(
     'elementtree',
     'testtools',
     'iso8601',
-    'python-ntlm',
+    'requests-ntlm',
     ],
     
   test_suite = "v1pysdk.tests",
