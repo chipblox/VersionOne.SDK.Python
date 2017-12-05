@@ -22,7 +22,7 @@ setup(
     'python-ntlm3',
     ],
 
-  python_requires='>=3'
+  python_requires='>=3',
 
   test_suite = "v1pysdk.tests",
   
