@@ -129,7 +129,7 @@ class BaseAsset(object):
   def _v1_getattr(self, attr):
     "Intercept access to missing attribute names. "
     "first return uncommitted data, then refresh if needed, then get single attr, else fail"
-    if self._v1_new_data.has_key(attr):
+    if attr in self._v1_new_data.keys():
       value = self._v1_new_data[attr]
     else:
       if self._v1_needs_refresh:
