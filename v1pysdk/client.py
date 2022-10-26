@@ -1,8 +1,8 @@
 
 import logging, time, base64
-from urllib.request import build_opener, urlopen, HTTPBasicAuthHandler, HTTPCookieProcessor, HTTPPasswordMgrWithDefaultRealm
+from urllib.request import build_opener, urlopen, HTTPBasicAuthHandler, HTTPCookieProcessor, HTTPPasswordMgrWithDefaultRealm, Request
 from urllib.error import HTTPError
-from urllib.parse import urlunparse, urlparse
+from urllib.parse import urlunparse, urlparse, urlencode
 
 try:
     from xml.etree import ElementTree
@@ -48,7 +48,21 @@ class V1AssetNotFoundError(V1Error):
 class V1Server(object):
   "Accesses a V1 HTTP server as a client of the XML API protocol"
 
-  def __init__(self, address="localhost", instance="VersionOne.Web", username='', password='', scheme="http", instance_url=None, logparent=None, loglevel=logging.ERROR, use_password_as_token=False):
+  def __init__(self, address="localhost", instance="VersionOne.Web", username='', password='', token=None, scheme="http", instance_url=None, logparent=None, loglevel=logging.ERROR):
+    """
+    If *instance_url* is set its value will override address, instance,
+    scheme and object's instance_url attributes.
+    If *token* is not None a HTTP header will be added to each request.
+    :param address: target hostname
+    :param instance: instance
+    :param username: credentials (username)
+    :param password: credentials (password)
+    :param token: credentials (authentication token)
+    :param scheme: HTTP scheme
+    :param instance_url: instance URL
+    :param logparent: logger prefix
+    :param loglevel: logging level
+    """
     if instance_url:
       self.instance_url = instance_url
       parsed = urlparse(instance_url)
@@ -67,17 +81,19 @@ class V1Server(object):
     self.logger.setLevel(loglevel)
     self.username = username
     self.password = password
-    self.use_password_as_token = use_password_as_token
+    self.token = token
     self._install_opener()
 
   def _install_opener(self):
     base_url = self.build_url('')
-    password_manager = HTTPPasswordMgrWithDefaultRealm()
-    password_manager.add_password(None, base_url, self.username, self.password)
-    handlers = [HandlerClass(password_manager) for HandlerClass in AUTH_HANDLERS]
-    self.opener = build_opener(*handlers)
-    if self.use_password_as_token:
-        self.opener.addheaders.append(('Authorization', 'Bearer ' + self.password))
+    if self.token:
+      self.opener = build_opener()
+      self.opener.addheaders.append( ('Authorization', 'Bearer {token}'.format(token=self.token)) )
+    else:
+      password_manager = HTTPPasswordMgrWithDefaultRealm()
+      password_manager.add_password(None, base_url, self.username, self.password)
+      handlers = [HandlerClass(password_manager) for HandlerClass in AUTH_HANDLERS]
+      self.opener = build_opener(*handlers)
     self.opener.add_handler(HTTPCookieProcessor())
 
   def http_get(self, url):

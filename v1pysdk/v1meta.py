@@ -119,7 +119,10 @@ class V1Meta(object):
         node = Element('Attribute')
         node.set('name', attrname)
         node.set('act', 'set')
-        node.text = str(newvalue)
+        if isinstance(newvalue, unicode) != True:
+            node.text = str(newvalue).decode('utf-8')
+        else:
+            node.text = newvalue
       update_doc.append(node)
     return update_doc
     
